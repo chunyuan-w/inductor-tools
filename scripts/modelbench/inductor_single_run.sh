@@ -3,7 +3,8 @@ export MALLOC_CONF="oversize_threshold:1,background_thread:true,metadata_thp:aut
 export KMP_AFFINITY=granularity=fine,compact,1,0
 export KMP_BLOCKTIME=1
 
-CORES=$(lscpu | grep Core | awk '{print $4}')
+# CORES=$(lscpu | grep Core | awk '{print $4}')
+CORES=1
 end_core=$(expr $CORES - 1)
 export OMP_NUM_THREADS=$CORES
 
@@ -14,6 +15,8 @@ CHANNELS=${4:-first}
 SHAPE=${5:-static}
 BS=${6:-0}
 MODE=${7:-inference}
+# default / cpp
+WRAPPER=${8:-default}
 
 Mode_extra="--inference "
 if [[ $MODE == "training" ]]; then
@@ -27,6 +30,16 @@ if [[ $SHAPE == "dynamic" ]]; then
     Shape_extra="--dynamic-shapes "
 fi
 
+Wrapper_extra=""
+if [[ $WRAPPER == "cpp" ]]; then
+    echo "Testing with cpp wrapper."
+    Wrapper_extra="--cpp-wrapper "
+fi
+
+if [[ $SHAPE == "static" ]]; then
+    export TORCHINDUCTOR_FREEZING=1
+fi
+
 Channels_extra=""
 if [[ ${CHANNELS} == "last" ]]; then
     Channels_extra="--channels-last "
@@ -37,6 +50,6 @@ if [[ ${BS} -gt 0 ]]; then
     BS_extra="--batch_size=${BS} "
 fi
 
-numactl -C 0-${end_core} --membind=0 python benchmarks/dynamo/${SUITE}.py --performance --${DT} -dcpu -n50 --no-skip --dashboard --only "${MODEL}" ${Channels_extra} ${BS_extra} ${Shape_extra} ${Mode_extra} --backend=inductor  --output=/tmp/inductor_single_test.csv
+numactl -C 0-${end_core} --membind=0 python benchmarks/dynamo/${SUITE}.py --performance --${DT} -dcpu -n50 --no-skip --dashboard --only "${MODEL}" ${Channels_extra} ${BS_extra} ${Shape_extra} ${Mode_extra} ${Wrapper_extra} --backend=inductor  --output=/tmp/inductor_single_test.csv
 
 cat /tmp/inductor_single_test.csv && rm /tmp/inductor_single_test.csv
